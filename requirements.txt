@@ -7,3 +7,4 @@ langchain_groq
 faiss-cpu
 PyMuPDF
 sentence-transformers
+langchain-huggingface

@@ -2,7 +2,8 @@ import fitz  # PyMuPDF
 import os
 from langchain_groq import ChatGroq
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# Updated import for the new package
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
@@ -29,6 +30,7 @@ def get_text_chunks(text):
     return chunks
 
 def get_vectorstore(text_chunks):
+    # Using the updated class
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
     return vectorstore
@@ -57,13 +59,12 @@ def create_rag_chain(vectorstore, groq_api_key):
 
 app = FastAPI(title="Financial Analyst API")
 
-# Add CORS middleware to allow requests from your Netlify frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 rag_chain = None
@@ -71,7 +72,7 @@ rag_chain = None
 class QuestionRequest(BaseModel):
     question: str
 
-@app.get("/", summary="Root endpoint to check API status")
+@app.get("/", summary="Root endpoint to check if the API is running")
 async def root():
     return {"message": "Financial Analyst API is running."}
 
@@ -84,7 +85,7 @@ async def process_pdfs_endpoint(files: List[UploadFile] = File(...)):
 
     groq_api_key = os.environ.get("GROQ_API_KEY")
     if not groq_api_key:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY environment variable not set.")
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY is not set in the environment.")
 
     try:
         raw_text = get_pdf_text(files)
@@ -94,18 +95,18 @@ async def process_pdfs_endpoint(files: List[UploadFile] = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process PDFs: {e}")
     
-    return {"status": "success", "message": f"{len(files)} PDF(s) processed. API is ready."}
+    return {"status": "success", "message": f"{len(files)} PDF(s) processed. The API is ready."}
 
 @app.post("/ask/", summary="Ask a question about the processed PDFs")
 async def ask_question_endpoint(request: QuestionRequest):
     global rag_chain
 
     if rag_chain is None:
-        raise HTTPException(status_code=400, detail="PDFs not processed. Call /process-pdfs/ first.")
+        raise HTTPException(status_code=400, detail="PDFs have not been processed. Please call the /process-pdfs/ endpoint first.")
 
     try:
         response = rag_chain.invoke({"input": request.question})
-        answer = response.get("answer", "Could not generate an answer.")
+        answer = response.get("answer", "Could not generate an answer from the provided context.")
         return {"question": request.question, "answer": answer}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating answer: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
